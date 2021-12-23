@@ -1,43 +1,33 @@
 import importlib
 import logging
-import os
-import random
-import shutil
 import time
-from collections import OrderedDict
-from functools import reduce
-
-import numpy as np
-import torch
+import os
 import torch.nn.functional as F
+import torch
+import shutil
+import numpy as np
+import random
 from skimage.io import imsave
-
-
-def to_numpy(tensor):
-    if isinstance(tensor, (int, float)):
-        return tensor
-    else:
-        return tensor.data.cpu().numpy()
-
+from functools import reduce
+from collections import OrderedDict
 
 def print_losses(current_losses, i_iter,logger):
     list_strings = []
     for loss_name, loss_value in current_losses.items():
-        list_strings.append(f'{loss_name} = {to_numpy(loss_value):.3f} ')
+        list_strings.append(f'{loss_name} = {to_numpy(loss_value):.4f} ')
     full_string = ' '.join(list_strings)
     logger.info(f'iter = {i_iter} {full_string}')
     # tqdm.write(f'iter = {i_iter} {full_string}')
+
 
 def import_config(config_name, prefix='configs'):
     cfg_path = '{}.{}'.format(prefix, config_name)
     m = importlib.import_module(name=cfg_path)
     os.makedirs(m.SNAPSHOT_DIR, exist_ok=True)
-    shutil.copy(cfg_path.replace('.', '/') + '.py', os.path.join(m.SNAPSHOT_DIR, 'config.py'))
+    shutil.copy(cfg_path.replace('.', '/')+'.py', os.path.join(m.SNAPSHOT_DIR, 'config.py'))
     return m
 
-
 def lr_poly(base_lr, iter, max_iter, power):
-    # 0.01 * (1-rate)^2
     return base_lr * ((1 - float(iter) / max_iter) ** (power))
 
 
@@ -55,7 +45,6 @@ def adjust_learning_rate(optimizer, i_iter, cfg):
         optimizer.param_groups[1]['lr'] = lr * 10
     return lr
 
-
 def adjust_learning_rate_D(optimizer, i_iter, cfg):
     if i_iter < cfg.PREHEAT_STEPS:
         lr = lr_warmup(cfg.LEARNING_RATE_D, i_iter, cfg.PREHEAT_STEPS)
@@ -65,7 +54,6 @@ def adjust_learning_rate_D(optimizer, i_iter, cfg):
     if len(optimizer.param_groups) > 1:
         optimizer.param_groups[1]['lr'] = lr * 10
     return lr
-
 
 def get_console_file_logger(name, level=logging.INFO, logdir='./baseline'):
     logger = logging.Logger(name)
@@ -90,10 +78,11 @@ def loss_calc(pred, label, reduction='mean'):
     """
     This function returns cross entropy loss for semantic segmentation
     """
-
+    
     loss = F.cross_entropy(pred, label.long(), ignore_index=-1, reduction=reduction)
+   
     return loss
-
+    
 
 def bce_loss(pred, label):
     """
@@ -102,11 +91,11 @@ def bce_loss(pred, label):
     return F.binary_cross_entropy_with_logits(pred, label)
 
 
+
 def robust_binary_crossentropy(pred, tgt):
     inv_tgt = -tgt + 1.0
     inv_pred = -pred + 1.0 + 1e-6
     return -(tgt * torch.log(pred + 1e-6) + inv_tgt * torch.log(inv_pred))
-
 
 def bugged_cls_bal_bce(pred, tgt):
     inv_tgt = -tgt + 1.0
@@ -139,18 +128,18 @@ def som(loss, ratio=0.5, reduction='none'):
 
 def seed_torch(seed=2333):
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed) 
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.enabled = True
-
+    
 
 def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2 ** 32
+    worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
@@ -159,7 +148,7 @@ def ias_thresh(conf_dict, n_class, alpha, w=None, gamma=1.0):
     if w is None:
         w = np.ones(n_class)
     # threshold
-    cls_thresh = np.ones(n_class, dtype=np.float32)
+    cls_thresh = np.ones(n_class,dtype = np.float32)
     for idx_cls in np.arange(0, n_class):
         if conf_dict[idx_cls] != None:
             arr = np.array(conf_dict[idx_cls])
@@ -182,13 +171,12 @@ COLOR_MAP = OrderedDict(
 
 palette = np.asarray(list(COLOR_MAP.values())).reshape((-1,)).tolist()
 
-
 def generate_pseudo(model, target_loader, save_dir, n_class=7, pseudo_dict=dict(), logger=None):
     logger.info('Start generate pseudo labels: %s' % save_dir)
     viz_op = er.viz.VisualizeSegmm(os.path.join(save_dir, 'vis'), palette)
     os.makedirs(os.path.join(save_dir, 'pred'), exist_ok=True)
     model.eval()
-    cls_thresh = np.ones(n_class) * 0.9
+    cls_thresh = np.ones(n_class)*0.9
     for image, labels in tqdm(target_loader):
         out = model(image.cuda())
         logits = out[0] if isinstance(out, tuple) else out
@@ -200,16 +188,15 @@ def generate_pseudo(model, target_loader, save_dir, n_class=7, pseudo_dict=dict(
         for cls in range(n_class):
             logits_cls_dict[cls].extend(logits_pred[label_pred == cls].astype(np.float16))
         # instance adaptive selector
-        tmp_cls_thresh = ias_thresh(logits_cls_dict, n_class, pseudo_dict['pl_alpha'], w=cls_thresh,
-                                    gamma=pseudo_dict['pl_gamma'])
+        tmp_cls_thresh = ias_thresh(logits_cls_dict, n_class, pseudo_dict['pl_alpha'],  w=cls_thresh, gamma=pseudo_dict['pl_gamma'])
         beta = pseudo_dict['pl_beta']
-        cls_thresh = beta * cls_thresh + (1 - beta) * tmp_cls_thresh
-        cls_thresh[cls_thresh >= 1] = 0.999
+        cls_thresh = beta*cls_thresh + (1-beta)*tmp_cls_thresh
+        cls_thresh[cls_thresh>=1] = 0.999
 
         np_logits = logits.data.cpu().numpy()
         for _i, fname in enumerate(labels['fname']):
             # save pseudo label
-            logit = np_logits[_i].transpose(1, 2, 0)
+            logit = np_logits[_i].transpose(1,2,0)
             label = np.argmax(logit, axis=2)
             logit_amax = np.amax(logit, axis=2)
             label_cls_thresh = np.apply_along_axis(lambda x: [cls_thresh[e] for e in x], 1, label)
@@ -221,31 +208,28 @@ def generate_pseudo(model, target_loader, save_dir, n_class=7, pseudo_dict=dict(
 
     return os.path.join(save_dir, 'pred')
 
-
 def entropyloss(logits, weight=None):
     """
     logits:     N * C * H * W
     weight:     N * 1 * H * W
     """
-    val_num = weight[weight > 0].numel()
+    val_num = weight[weight>0].numel()
     logits_log_softmax = torch.log_softmax(logits, dim=1)
     entropy = -torch.softmax(logits, dim=1) * weight * logits_log_softmax
     entropy_reg = torch.sum(entropy) / val_num
     return entropy_reg
-
 
 def kldloss(logits, weight):
     """
     logits:     N * C * H * W
     weight:     N * 1 * H * W
     """
-    val_num = weight[weight > 0].numel()
+    val_num = weight[weight>0].numel()
     logits_log_softmax = torch.log_softmax(logits, dim=1)
     num_classes = logits.size()[1]
-    kld = - 1 / num_classes * weight * logits_log_softmax
+    kld = - 1/num_classes * weight * logits_log_softmax
     kld_reg = torch.sum(kld) / val_num
     return kld_reg
-
 
 def count_model_parameters(module, _default_logger=None):
     cnt = 0
@@ -254,8 +238,7 @@ def count_model_parameters(module, _default_logger=None):
     _default_logger.info('#params: {}, {} M'.format(cnt, round(cnt / float(1e6), 3)))
 
     return cnt
-
-
+    
 if __name__ == '__main__':
     seed_torch(2333)
     s = torch.randn((5, 5)).cuda()

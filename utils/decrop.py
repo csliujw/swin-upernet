@@ -1,8 +1,9 @@
-import os
 import glob
-import random
-from skimage.io import imread,imsave
+import os
+
 import numpy as np
+from skimage.io import imread, imsave
+
 # root_dir = r'J:\2021LoveDA\Test\Urban'
 #
 #

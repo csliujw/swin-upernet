@@ -1,4 +1,0 @@
-2021-12-19 22:02:49, INFO:DA-Swin:exp = /home/qq/code/liujiawei/SwinTransformer/dalog/focal/
-2021-12-19 22:02:49, INFO:DA-Swin:epochs ~= 109.170
-2021-12-19 22:02:52, INFO:DA-Swin:exp = /home/qq/code/liujiawei/SwinTransformer/dalog/focal/
-2021-12-19 22:02:52, INFO:DA-Swin:iter = 0 loss_seg1 = 0.453  loss_adv1 = 0.693,  loss_D1 = 0.693  G_lr = 0.00000 D_lr = 0.00000

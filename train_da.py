@@ -1,10 +1,13 @@
 import argparse
 
 import torch
+import torch
 
-from dataset.nj import NJLoader
-from models.SwinUperDANet import SwinUperNet
-from train.engine import ad_train_seg_singal
+from data.loveda import LoveDALoader
+from module.SwinUperNet import SwinUperNet
+from train.engine import train_single, predict
+from utils.tools import import_config, get_console_file_logger
+from train.engine import ad_train_advent_single
 from utils.tools import import_config, get_console_file_logger
 
 parser = argparse.ArgumentParser(description='Run CBST methods.')
@@ -20,9 +23,9 @@ logger = get_console_file_logger(name='DA-Swin', logdir=cfg.SNAPSHOT_DIR)
 def main():
     model = SwinUperNet()
     torch.cuda.empty_cache()
-    trainloader = NJLoader(cfg.SOURCE_DATA_CONFIG)
-    evalloader = NJLoader(cfg.TARGET_DATA_CONFIG)
-    ad_train_seg_singal(model, cfg.NUM_STEPS, cfg, trainloader, evalloader,logger)
+    trainloader = LoveDALoader(cfg.SOURCE_DATA_CONFIG)
+    targetloader = LoveDALoader(cfg.TARGET_DATA_CONFIG)
+    ad_train_advent_single(model, cfg.NUM_STEPS, cfg, trainloader, targetloader,logger)
 
 if __name__ == '__main__':
     main()
